@@ -29,6 +29,7 @@ class Program
         "https://studiob.rs/",
         "https://happytv.rs/",
         "https://objektiv.rs/",
+        "https://www.republika.rs/",
         "https://www.tanjug.rs"
     };
 
