@@ -57,22 +57,88 @@ class Program
     {
         using (var httpClient = new HttpClient())
         {
-            foreach (string url in zabranjeniUrlovi)
+            foreach (string baseUrl in zabranjeniUrlovi)
             {
                 try
                 {
-                    string html = await httpClient.GetStringAsync(url);
-                    Match match = Regex.Match(html, "<title>\\s*(.+?)\\s*</title>", RegexOptions.IgnoreCase);
-                    if (match.Success)
+                    string rssUrl = baseUrl.TrimEnd('/') + "/rss";
+                    HttpResponseMessage response = await httpClient.GetAsync(rssUrl);
+                    string contentType = response.Content.Headers.ContentType.MediaType;
+
+                    string content = await response.Content.ReadAsStringAsync();
+
+                    if (contentType.Contains("xml") || content.TrimStart().StartsWith("<rss") || content.Contains("<item>"))
                     {
-                        string title = match.Groups[1].Value.ToLower();
-                        zabranjeniNaslovi.Add(title);
+                        await ParsirajRSS(content);
+                    }
+                    else
+                    {
+                        await PronadjiRSSLinkoveIZHtmla(httpClient, baseUrl, content);
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    // Console.WriteLine($"Greška kod {baseUrl}: {ex.Message}");
+                }
             }
         }
     }
+
+    private static async Task PronadjiRSSLinkoveIZHtmla(HttpClient httpClient, string baseUrl, string html)
+    {
+        var rssLinks = new HashSet<string>();
+        MatchCollection matches = Regex.Matches(html, "<a[^>]+href=[\"']([^\"']+)[\"']", RegexOptions.IgnoreCase);
+
+        foreach (Match match in matches)
+        {
+            string href = match.Groups[1].Value;
+
+            if (href.Contains("rss") || href.EndsWith(".xml") || href.Contains("feed"))
+            {
+                string fullUrl = href.StartsWith("http") ? href : baseUrl.TrimEnd('/') + "/" + href.TrimStart('/');
+
+                try
+                {
+                    string rssContent = await httpClient.GetStringAsync(fullUrl);
+                    if (rssContent.Contains("<item>"))
+                    {
+                        await ParsirajRSS(rssContent);
+                    }
+                }
+                catch
+                {
+                    // skip ako ne može da se skine/parsira
+                }
+            }
+        }
+    }
+
+    private static async Task ParsirajRSS(string rssContent)
+    {
+        var xmlDoc = new System.Xml.XmlDocument();
+        try
+        {
+            xmlDoc.LoadXml(rssContent);
+            var itemNodes = xmlDoc.SelectNodes("//item");
+
+            if (itemNodes == null) return;
+
+            foreach (System.Xml.XmlNode item in itemNodes)
+            {
+                string title = item["title"]?.InnerText?.Trim().ToLower();
+                if (!string.IsNullOrWhiteSpace(title) && !zabranjeniNaslovi.Contains(title))
+                {
+                    zabranjeniNaslovi.Add(title);
+                }
+            }
+        }
+        catch
+        {
+            // nije validan XML
+        }
+    }
+
+
 
     private static void Run()
     {
