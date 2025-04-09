@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -40,18 +39,16 @@ class Program
     {
         try
         {
-            if (File.Exists(logPath))
-                File.Delete(logPath);
-
-            if (File.Exists(triggerPath))
-                File.Delete(triggerPath);
-
-            if (File.Exists(blackList))
-                File.Delete(blackList);
-
+            foreach (var path in new[] { logPath, triggerPath, blackList })
+            {
+                if (File.Exists(path))
+                    File.Delete(path);
+            }
+        }
+        catch
+        {
             
         }
-        catch { }
 
 
 
@@ -112,40 +109,6 @@ class Program
             Log($"⚠️ Greška prilikom pisanja blacklist.txt: {ex.Message}");
         }
     }
-
-    private static async Task VerifikujNaslovSaMetaAsync(string rssTitle, string linkUrl, HttpClient httpClient)
-    {
-        try
-        {
-            string html = await httpClient.GetStringAsync(linkUrl);
-
-            Match metaMatch = Regex.Match(html, "<meta[^>]+name=[\"']title[\"'][^>]+content=[\"']([^\"']+)[\"']", RegexOptions.IgnoreCase);
-
-            if (metaMatch.Success)
-            {
-                string metaTitle = metaMatch.Groups[1].Value.Trim().ToLower();
-                string rssTitleClean = rssTitle.Trim().ToLower();
-
-                if (metaTitle != rssTitleClean)
-                {
-                    Log($"🔁 RAZLIKA DETEKTOVANA:\nRSS:  {rssTitleClean}\nMETA: {metaTitle}");
-                }
-                else
-                {
-                    Log($"✅ RSS i META naslov se poklapaju: {rssTitleClean}");
-                }
-            }
-            else
-            {
-                Log($"⚠️ Nema <meta name=\"title\"> na: {linkUrl}");
-            }
-        }
-        catch (Exception ex)
-        {
-            Log($"❌ Greška prilikom verifikacije meta title sa {linkUrl}: {ex.Message}");
-        }
-    }
-
 
 
     private static async Task PronadjiRSSLinkoveIZHtmla(HttpClient httpClient, string baseUrl, string html)
@@ -284,7 +247,7 @@ class Program
                 {
                     zabranjeniNaslovi.Add(naslovZaDodavanje);
                     dodato++;
-                    Log($"➕ Dodajem naslov: {naslovZaDodavanje}");
+                    //Log($"➕ Dodajem naslov: {naslovZaDodavanje}");
                 }
             }
 
